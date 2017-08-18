@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/html">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <title>WS</title>
+
+    <script type="application/javascript" src="jquery.js"></script>
+
+    <script type="application/javascript">
+
+        var sessionID = Math.floor(10000+Math.random()*88888)+1;
+
+        var ActiveSessions = {};
+
+        var SentMessages = [];
+
+        var ReceivedMessages = [];
+
+    </script>
+
+</head>
+<body>
+
+<div style="width: 225px;height: 200px; overflow: auto;"><table><tr><td><div id="session"></div></td><td><div id="text"></div></td></tr></table></div>
+<input type="text" id="textvalue">
+<button id="sendbutton">Send</button>
+<h3 id="Points">0</h3>
+<canvas id=groundCvas width="500px" height="500px" style="border: solid 3px;"></canvas>
+
+
+<script type="application/javascript">
+
+
+    groundCvas = document.getElementById("groundCvas");
+    groundBox = groundCvas.getContext("2d");
+
+    MESSAGE = document.getElementById("text");
+    SESSION = document.getElementById("session");
+
+    ObjectsInField = {};
+
+
+    var POINTS = 0;
+    var DIFFICULTITY = 1;
+    var LEADER = "";
+    var READYS = 0;
+    var START = false;
+
+
+    object = {
+        id: 0,
+        x: 0,
+        y: 0,
+        width: 30,
+        height: 0
+    };
+
+    function sendMessage(msg) {
+        message = {};
+        if (!msg) {
+            value = document.getElementById("textvalue").value;
+
+            if(value == "")
+            {
+                value = " ";
+            }
+
+            message = {
+                ID: Math.floor(Math.random() * 9999999) + 1,
+                Message: value,
+                Session: sessionID
+            };
+        } else {
+            message = {
+                ID: Math.floor(Math.random() * 9999999) + 1,
+                Message: msg,
+                Session: sessionID
+            };
+        }
+
+        console.log(message);
+
+        XMLHTTP = new XMLHttpRequest();
+        SentMessages += message;
+
+        messageJSON = JSON.stringify(message);
+
+        XMLHTTP.onreadystatechange = function () {
+            if( XMLHTTP.readyState == 4 && XMLHTTP.status == 200)
+            {
+                if(XMLHTTP.response.length > 0) {
+                    console.log("Response: " + XMLHTTP.response);
+                    if (XMLHTTP.response == "Success") {
+                        for (msg in SentMessages) {
+                            if (SentMessages[msg].ID == message.ID) {
+                                SentMessages.splice(msg, 1);
+                            }
+                        }
+
+                        SESSION.innerHTML = message.Session + "<br>" + SESSION.innerHTML;
+                        MESSAGE.innerHTML = message.Message + "<br>" + MESSAGE.innerHTML;
+
+                    } else if (XMLHTTP.response == "Failure") {
+                        console.log("Failure");
+                        XMLHTTP.open("POST", "data.php", true);
+                        XMLHTTP.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+                        XMLHTTP.send("data=" + messageJSON);
+                    }
+                }
+            }
+        };
+
+        XMLHTTP.open("POST", "data.php", true);
+        XMLHTTP.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+        XMLHTTP.send("data="+messageJSON);
+    }
+
+    $('#sendbutton').click(function() {
+
+        sendMessage();
+
+    });
+
+    document.onkeydown = keyCode;
+    function keyCode(e) {
+        //console.log("Keycode: " & e.keyCode.toString());
+        switch(e.keyCode) {
+            case 37: // Left
+                if(ActiveSessions[sessionID].X > 60)
+                sendMessage("Left");
+                break;
+            case 38: // Down
+                if(ActiveSessions[sessionID].Y > 30)
+                sendMessage("Down");
+                break;
+            case 39: // Right
+                if(ActiveSessions[sessionID].X < 470)
+                sendMessage("Right");
+                break;
+            case 40: // Up
+                if(ActiveSessions[sessionID].Y < 470)
+                sendMessage("Up");
+                break;
+        }
+    }
+
+    setInterval(checkMessages, 200);
+    var timer = setInterval(interactiveField, 100 / ((DIFFICULTITY/10)+1));
+
+    function interactiveField()
+    {
+        if(START == true) {
+            POINTS += 1;
+
+            document.getElementById("Points").innerHTML = POINTS;
+
+            if(sessionID == LEADER) {
+                    if (Object.keys(ObjectsInField).length < DIFFICULTITY) {
+                        s = Math.floor(Math.random() * 2 + 1);
+
+                        height = 50 * Math.floor(Math.random() * 10 + 1);
+                        x = (30 * s) * Math.floor((Math.random() * (8 * s)) + 1);
+
+                        msg1 = x;
+                        if (msg1 < 100)
+                            msg1 = '0' + msg1;
+
+                        msg2 = height;
+                        if (msg2 < 100)
+                            msg2 = '0' + msg2;
+
+                        message = "BA" + msg1 + msg2;
+                        sendMessage(message);
+                    }
+                }
+        }
+
+        groundBox.clearRect(0, 0, 500, 500);
+
+        for(Session in ActiveSessions) {
+            switch (ActiveSessions[Session].Color) {
+                case 0:
+                    groundBox.strokeStyle = "red";
+                        if(LEADER == "")
+                        {
+                            LEADER = Session;
+                        }
+                    break;
+
+                case 1:
+                    groundBox.strokeStyle = "blue";
+                    break;
+
+                case 2:
+                    groundBox.strokeStyle = "green";
+                    break;
+
+                case 3:
+                    groundBox.strokeStyle = "yellow";
+                    break;
+            }
+
+
+            groundBox.strokeRect(ActiveSessions[Session].X, ActiveSessions[Session].Y, 28, 28);
+            groundBox.strokeStyle = "black";
+        }
+
+        for(Obj in ObjectsInField) {
+            if (ObjectsInField[Obj].y > 500)
+            {
+                console.log("Borrando: " + Obj);
+                delete ObjectsInField[Obj];
+            } else {
+                if(Obj) {
+                    ObjectsInField[Obj].y += 4;
+                    groundBox.fillRect(ObjectsInField[Obj].x, ObjectsInField[Obj].y, ObjectsInField[Obj].width, ObjectsInField[Obj].height);
+                }
+            }
+
+        }
+
+        for(Obj in ObjectsInField) {
+            if(ActiveSessions[sessionID].X > ObjectsInField[Obj].x && ActiveSessions[sessionID].X+28 < (ObjectsInField[Obj].x + ObjectsInField[Obj].width))
+            {
+                //console.log("Tada");
+                if(ActiveSessions[sessionID].Y+28 > ObjectsInField[Obj].y && ActiveSessions[sessionID].Y-5 < ObjectsInField[Obj].y-5 + ObjectsInField[Obj].height)
+                {
+                    clearInterval(timer);
+                    alert("Game Over\nTu puntaje es " + POINTS + " puntos.");
+                }
+            }
+        }
+
+
+        if(POINTS % 50 == 0 && POINTS != 0)
+        {
+            DIFFICULTITY += 1;
+            clearInterval(timer);
+            timer =setInterval(interactiveField, 100 / ((DIFFICULTITY/10)+1));
+            console.log(100 / ((DIFFICULTITY/10)+1));
+        }
+
+
+    }
+
+    function checkMessages()
+    {
+        XMLHTTP = new XMLHttpRequest();
+
+        var XHTTPResponse;
+
+        XMLHTTP.onreadystatechange = function()
+        {
+            if( XMLHTTP.readyState == 4 && XMLHTTP.status == 200)
+            {
+
+                XHTTPResponse = XMLHTTP.response;
+
+                if(XHTTPResponse != "\0" && XHTTPResponse != "") {
+                    console.log("Response: " + XMLHTTP.response);
+
+                    messages = parseInt(XHTTPResponse.substr(0, 1));
+
+                    position = 1;
+
+                    if (messages > 0) {
+                        //groundBox.clearRect(0, 0, 500, 500);
+                        for (m = 0; m < messages; m++) {
+                            //MLLSSSSSMMMMMMMMLLSSSSSMMMMM
+                            SESSION.innerHTML = XHTTPResponse.substr(position + 2, 5) + "<br>" + SESSION.innerHTML;
+                            MESSAGE.innerHTML = XHTTPResponse.substr(position + 7, parseInt(XHTTPResponse.substr(position, 2))) + "<br>" + MESSAGE.innerHTML;
+
+                            if(XHTTPResponse.substr(position + 7, 2) == "BA")
+                            {
+                                obj = JSON.parse(JSON.stringify(object));
+                                obj.x = parseInt(XHTTPResponse.substr(position + 9, 3));
+                                obj.height = parseInt(XHTTPResponse.substr(position + 12, 3));
+                                console.log("Height: " + XHTTPResponse.substr(position + 10, 3));
+                                console.log("X: " + XHTTPResponse.substr(position + 7, 3));
+                                obj.id = Math.floor(Math.random() * 999999999);
+                                obj.y = obj.y - obj.height;
+
+                                ObjectsInField[obj.id] = obj;
+                            } else if(XHTTPResponse.substr(position+7, 5) == "Ready") {
+                                READYS += 1;
+
+                                if(READYS == Object.keys(ActiveSessions).length)
+                                {
+                                    sendMessage("Start");
+                                }
+                            } else if(XHTTPResponse.substr(position+7, 5) == "Start") {
+                                START = true;
+                            }
+                            else {
+                                if (Object.keys(ActiveSessions).length == 0) {
+                                    NewSession = {
+                                        ID: parseInt(XHTTPResponse.substr(position + 2, 5)),
+                                        Name: XHTTPResponse.substr(position + 2, 5),
+                                        X: 241,
+                                        Y: 241,
+                                        Points: 0,
+                                        Color: Object.keys(ActiveSessions).length
+                                    };
+
+                                    ActiveSessions[NewSession.ID] = NewSession;
+
+                                    console.log("Agregado: " + NewSession.ID);
+                                } else {
+                                    found = false;
+                                    for (Session in ActiveSessions) {
+                                        //console.log("Test");
+
+                                        console.log("Buscando: " + XHTTPResponse.substr(position + 2, 5));
+                                        console.log("Tengo: " + Session);
+
+                                        //console.log(Session + " ... " + XHTTPResponse.substr(position + 2, 5));
+                                        if (parseInt(Session) == parseInt(XHTTPResponse.substr(position + 2, 5))) {
+                                            console.log("Cuando " + Session + " es igual a " + XHTTPResponse.substr(position + 2, 5));
+                                            found = true;
+                                            switch (XHTTPResponse.substr(position + 7, parseInt(XHTTPResponse.substr(position, 2)))) {
+                                                case "Left":
+                                                    ActiveSessions[Session].X -= 30;
+                                                    break;
+
+                                                case "Right":
+                                                    ActiveSessions[Session].X += 30;
+                                                    break;
+
+                                                case "Up":
+                                                    ActiveSessions[Session].Y += 30;
+                                                    break;
+
+                                                case "Down":
+                                                    ActiveSessions[Session].Y -= 30;
+                                                    break;
+                                            }
+                                        }
+
+                                        console.log("Llego hasta aca!");
+                                        console.log(found);
+
+                                        //ActiveSessions[Session.ID].X =
+
+
+                                    }
+
+                                    if (!found) {
+                                        console.log("No fue encontrada");
+                                        NewSession = {
+                                            ID: parseInt(XHTTPResponse.substr(position + 2, 5)),
+                                            Name: XHTTPResponse.substr(position + 2, 5),
+                                            X: 241,
+                                            Y: 241,
+                                            Points: 0,
+                                            Color: Object.keys(ActiveSessions).length
+                                        };
+
+                                        ActiveSessions[NewSession.ID] = NewSession;
+                                        console.log("Agregado: " + NewSession.ID);
+                                    }
+                                }
+                            }
+
+                            position += parseInt(XHTTPResponse.substr(position, 2)) + 5 + 2;
+                        }
+
+                        for (Session in ActiveSessions) {
+                            groundBox.strokeRect(ActiveSessions[Session].X, ActiveSessions[Session].Y, 28, 28);
+                        }
+                    }
+
+                }
+
+            }
+        };
+
+        XMLHTTP.open("POST", "get.php", false);
+        XMLHTTP.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+        XMLHTTP.send('Session='+sessionID);
+    }
+
+    function connect()
+    {
+        XMLHTTP = new XMLHttpRequest();
+
+        XMLHTTP.onreadystatechange = function()
+        {
+            if( XMLHTTP.readyState == 4 && XMLHTTP.status == 200)
+            {
+
+                if(XMLHTTP.response.length > 0)
+                {
+                    console.log("Connection: " + XMLHTTP.response);
+                }
+
+
+            }
+        };
+
+        XMLHTTP.open("POST", "session.php", false);
+        XMLHTTP.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+        XMLHTTP.send('Session='+sessionID);
+    }
+
+
+    connect();
+
+</script>
+
+</body>
+</html>
